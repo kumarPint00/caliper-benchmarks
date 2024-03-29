@@ -1,57 +1,45 @@
-/*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
-
 'use strict';
 
-const OperationBase = require('./utils/operation-base');
-const SimpleState = require('./utils/simple-state');
+module.exports.info = 'opening accounts';
+const { v1: uuidv4 } = require('uuid')
 
-/**
- * Workload module for initializing the SUT with various accounts.
- */
-class Open extends OperationBase {
+let account_array = [];
 
-    /**
-     * Initializes the parameters of the workload.
-     */
-    constructor() {
-        super();
+let bc, contx;
+var txnPerBatch = 1
+module.exports.init = function (blockchain, context, args) {
+    if (!args.hasOwnProperty('txnPerBatch')) {
+        args.txnPerBatch = 1;
     }
+    txnPerBatch = args.txnPerBatch;
+    bc = blockchain;
+    contx = context;
 
-    /**
-     * Create an empty state representation.
-     * @return {SimpleState} The state instance.
-     */
-    createSimpleState() {
-        return new SimpleState(this.workerIndex, this.initialMoney, this.moneyToTransfer);
-    }
+    return Promise.resolve();
+};
 
-    /**
-     * Assemble TXs for opening new accounts.
-     */
-    async submitTransaction() {
-        let createArgs = this.simpleState.getOpenAccountArguments();
-        await this.sutAdapter.sendRequests(this.createConnectorRequest('open', createArgs));
+
+function generateWorkload() {
+    let workload = [];
+    for (let i = 0; i < txnPerBatch; i++) {
+        let id = uuidv4();
+        account_array.push(id)
+
+        workload.push({
+            chaincodeFunction: 'create',
+            chaincodeArguments: [id, 'A', 'B', 'C', "d"],
+        });
     }
+    return workload;
 }
 
-/**
- * Create a new instance of the workload module.
- * @return {WorkloadModuleInterface}
- */
-function createWorkloadModule() {
-    return new Open();
-}
+module.exports.run = function () {
+    let args = generateWorkload();
+    return bc.invokeSmartContract(contx, 'MineTrace', '1', args);
+};
 
-module.exports.createWorkloadModule = createWorkloadModule;
+module.exports.end = function () {
+    return Promise.resolve();
+};
+
+module.exports.account_array = account_array;
